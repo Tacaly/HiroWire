@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+<!-- This block will replace the 'content' block in base.html -->
+{% block content %}
+<div class="w-full max-w-4xl mx-auto">
+    <div class="bg-gray-800 rounded-lg shadow-xl p-6 md:p-8">
+        <h2 class="text-2xl font-semibold text-white mb-4">Existing Peers (Renewal)</h2>
+        <button type="button" id="fetch-peers-btn"
+                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 mb-4">
+            Fetch Current Peers
+        </button>
+        <div id="peer-status" class="text-gray-400 mb-4"></div>
+        
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-700">
+                <thead class="bg-gray-700">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Name</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Public Key</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Allowed IPs</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="peer-table-body" class="bg-gray-800 divide-y divide-gray-700">
+                    <!-- Rows will be injected by JavaScript -->
+                    <tr><td colspan="4" class="px-6 py-4 text-gray-500 text-center">Click "Fetch Current Peers" to load data.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- Peer Management JavaScript ---
+    document.addEventListener('DOMContentLoaded', () => {
+        const fetchBtn = document.getElementById('fetch-peers-btn');
+        const peerTableBody = document.getElementById('peer-table-body');
+        const peerStatus = document.getElementById('peer-status');
+
+        if (fetchBtn) {
+            fetchBtn.addEventListener('click', fetchPeers);
+        }
+
+        async function fetchPeers() {
+            peerStatus.textContent = 'Fetching peers...';
+            peerTableBody.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-gray-500 text-center">Loading...</td></tr>';
+            
+            try {
+                const response = await fetch('/api/peers');
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.statusText}`);
+                }
+                const data = await response.json();
+                
+                // OPNsense API returns rows in a 'rows' key
+                if (data && data.rows && data.rows.length > 0) {
+                    peerTableBody.innerHTML = ''; // Clear loading
+                    data.rows.forEach(peer => {
+                        const row = document.createElement('tr');
+                        // Truncate public key for display
+                        const shortKey = peer.pubkey.substring(0, 10) + '...' + peer.pubkey.substring(peer.pubkey.length - 10);
+                        
+                        row.innerHTML = `
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-200">${peer.name}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400 font-mono" title="${peer.pubkey}">${shortKey}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">${peer.allowedips}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <button type="button" class="text-red-500 hover:text-red-700" data-uuid="${peer.uuid}">
+                                    Delete
+                                </button>
+                            </td>
+                        `;
+                        // Add delete event listener to the new button
+                        row.querySelector('button[data-uuid]').addEventListener('click', deletePeer);
+                        peerTableBody.appendChild(row);
+                    });
+                    peerStatus.textContent = `Loaded ${data.rows.length} peers.`;
+                } else {
+                    peerStatus.textContent = 'No peers found on server.';
+                    peerTableBody.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-gray-500 text-center">No peers found.</td></tr>';
+                }
+
+            } catch (error) {
+                console.error('Failed to fetch peers:', error);
+                peerStatus.textContent = `Error: ${error.message}`;
+                peerTableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-4 text-red-400 text-center">Failed to load peers.</td></tr>`;
+            }
+        }
+
+        async function deletePeer(event) {
+            const button = event.target;
+            const uuid = button.getAttribute('data-uuid');
+            
+            if (!uuid || !confirm(`Are you sure you want to delete this peer?\nUUID: ${uuid}`)) {
+                return;
+            }
+
+            peerStatus.textContent = `Deleting peer ${uuid}...`;
+
+            try {
+                const response = await fetch('/api/delete_peer', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ uuid: uuid }),
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(errorText || `Server error: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                if (result.status === 'deleted') {
+                    peerStatus.textContent = `Peer ${uuid} deleted successfully.`;
+                    // Remove the row from the table
+                    button.closest('tr').remove();
+                } else {
+                    throw new Error('Unknown response from server.');
+                }
+            } catch (error) {
+                console.error('Failed to delete peer:', error);
+                peerStatus.textContent = `Error deleting peer: ${error.message}`;
+            }
+        }
+    });
+</script>
+{% endblock content %}

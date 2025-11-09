@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+<!-- This block will replace the 'content' block in base.html -->
+{% block content %}
+<div class="w-full max-w-2xl mx-auto">
+
+    <h1 class="text-3xl font-bold text-center text-white mb-6">Generate or Add Peer</h1>
+
+    <!-- Error Message -->
+    {% if error and error != "" %}
+    <div class="bg-red-800 border border-red-600 text-red-100 px-4 py-3 rounded-lg mb-6" role="alert">
+        <strong class="font-bold">Error:</strong>
+        <span class="block sm:inline">{{ error }}</span>
+    </div>
+    {% endif %}
+
+    <!-- OPNsense Status Message -->
+    {% if opnsense_status and opnsense_status != "" %}
+    <div class="bg-blue-800 border border-blue-600 text-blue-100 px-4 py-3 rounded-lg mb-6" role="alert">
+        <strong class="font-bold">OPNsense Status:</strong>
+        <span class="block sm:inline">{{ opnsense_status }}</span>
+    </div>
+    {% endif %}
+
+    <!-- Main Form -->
+    <form action="/" method="POST" class="space-y-6 bg-gray-800 rounded-lg shadow-xl p-6 md:p-8">
+        
+        <div>
+            <label for="client_name" class="block text-sm font-medium text-gray-300 mb-1">Client Name</label>
+            <input type="text" name="client_name" id="client_name" required
+                   value="{{ form_data.client_name | default(value='') }}"
+                   class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                   placeholder="e.g., 'Bobs-Phone'">
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label for="client_address_v4" class="block text-sm font-medium text-gray-300 mb-1">Client IPv4</label>
+                <input type="text" name="client_address_v4" id="client_address_v4" required
+                       value="{{ form_data.client_address_v4 | default(value='') }}"
+                       class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                       placeholder="10.0.1.5/32">
+            </div>
+            <div>
+                <label for="client_address_v6" class="block text-sm font-medium text-gray-300 mb-1">Client IPv6</label>
+                <input type="text" name="client_address_v6" id="client_address_v6" required
+                       value="{{ form_data.client_address_v6 | default(value='') }}"
+                       class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                       placeholder="fd10:0:1::5/128">
+            </div>
+        </div>
+
+        <!-- "Upload" (Paste) Existing Key Section -->
+        <div class="border-t border-gray-700 pt-4">
+            <p class="text-sm text-gray-400 mb-2">...OR paste existing keys (optional)</p>
+            <div class="space-y-4">
+                <div>
+                    <label for="existing_public_key" class="block text-sm font-medium text-gray-300 mb-1">Existing Public Key</label>
+                    <input type="text" name="existing_public_key" id="existing_public_key"
+                           value="{{ form_data.existing_public_key | default(value='') }}"
+                           class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                           placeholder="Paste public key here...">
+                </div>
+                <div>
+                    <label for="existing_preshared_key" class="block text-sm font-medium text-gray-300 mb-1">Existing Preshared Key</dlabel>
+                    <input type="text" name="existing_preshared_key" id="existing_preshared_key"
+                           value="{{ form_data.existing_preshared_key | default(value='') }}"
+                           class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                           placeholder="Paste PSK here...">
+                </div>
+                <p class="text-xs text-gray-500">Note: If you provide existing keys, a .tail config file cannot be generated (as we don't have the private key).</p>
+            </div>
+        </div>
+
+        <div class="flex items-center pt-4 border-t border-gray-700">
+            <input id="push_to_opnsense" name="push_to_opnsense" type="checkbox"
+                   {% if form_data.push_to_opnsense %}checked{% endif %}
+                   class="h-5 w-5 bg-gray-700 border-gray-600 text-blue-500 rounded focus:ring-blue-500 focus:ring-offset-gray-800">
+            <label for="push_to_opnsense" class="ml-3 text-sm font-medium text-gray-300">Push to OPNsense API</label>
+        </div>
+
+        <div>
+            <button type="submit"
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition duration-200">
+                Generate or Add Peer
+            </button>
+        </div>
+    </form>
+
+    <!-- Generated Config Output -->
+    {% if client_config and client_config != "" %}
+    <div class="mt-8 bg-gray-800 rounded-lg shadow-xl p-6 md:p-8">
+        <h2 class="text-2xl font-semibold text-white mb-4">Generated Client Config:</h2>
+        <pre class="bg-gray-900 text-gray-300 p-4 rounded-lg overflow-x-auto text-sm"><code id="config-content">{{ client_config }}</code></pre>
+        
+        <div class="flex space-x-2 mt-4">
+            <!-- "Copy to clipboard" button -->
+            <button type="button"
+                onclick="copyConfig()"
+                class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 transition duration-200">
+                Copy Config
+            </button>
+
+            <!-- "Download .tail" button -->
+            <button type="button"
+                onclick="downloadKey('config-content', '.tail')"
+                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200">
+                Download .tail
+            </button>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- NEW: "PKI" Key File Downloads -->
+    {% if client_private_key %}
+    <div class="mt-8 bg-gray-800 rounded-lg shadow-xl p-6 md:p-8">
+        <h2 class="text-2xl font-semibold text-white mb-4">Generated Key Files:</h2>
+        <p class="text-gray-400 text-sm mb-4">For advanced use, you can download the individual keys.</p>
+        
+        <!-- Store key data in hidden elements -->
+        <div id="private-key-data" class="hidden">{{ client_private_key }}</div>
+        <div id="public-key-data" class="hidden">{{ client_public_key }}</div>
+        <div id="psk-key-data" class="hidden">{{ client_preshared_key }}</div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- Private Key -->
+            <div>
+                <strong class="text-gray-300">Private Key</strong>
+                <button type="button" onclick="downloadKey('private-key-data', '.key')"
+                        class="w-full mt-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 transition duration-200">
+                    Download .key
+                </button>
+            </div>
+            <!-- Public Key -->
+            <div>
+                <strong class="text-gray-300">Public Key</strong>
+                <button type="button" onclick="downloadKey('public-key-data', '.pub')"
+                        class="w-full mt-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 transition duration-200">
+                    Download .pub
+                </button>
+            </div>
+            <!-- Preshared Key -->
+            <div>
+                <strong class="text-gray-300">Preshared Key</strong>
+                <button type="button" onclick="downloadKey('psk-key-data', '.psk')"
+                        class="w-full mt-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 transition duration-200">
+                    Download .psk
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+
+<script>
+    // --- Config Copy/Download Functions ---
+    function copyConfig() {
+        const configText = document.getElementById('config-content').innerText;
+        const textArea = document.createElement('textarea');
+        textArea.value = configText;
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+            document.execCommand('copy');
+        } catch (err) {
+            console.error('Fallback: Oops, unable to copy', err);
+        }
+        document.body.removeChild(textArea);
+    }
+
+    function downloadKey(elementId, extension) {
+        let clientName = document.getElementById('client_name').value || 'client';
+        // Sanitize filename
+        let fileName = clientName.replace(/[^a-z0-9]/gi, '_').toLowerCase() + extension;
+        const keyText = document.getElementById(elementId).innerText;
+        
+        const blob = new Blob([keyText], { type: 'text/plain;charset=utf-8' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+    }
+</script>
+{% endblock content %}

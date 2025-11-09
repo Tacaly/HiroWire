@@ -1,0 +1,10 @@
+# Ignore build artifacts
+target/
+Cargo.lock
+
+# Ignore git history
+.git/
+.gitignore
+
+# Ignore local environment files
+.env

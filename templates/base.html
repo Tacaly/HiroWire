@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-900">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale-1.0">
+    <title>{{ title | default(value="WG Tool") }} - WireGuard Manager</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="h-full">
+    <div class="min-h-full">
+        
+        <!-- Main container: Sidebar + Content -->
+        <div class="flex">
+
+            <!-- Sidebar -->
+            {% include "sidebar.html" %}
+
+            <!-- Main Content Area -->
+            <div class="flex-1 flex flex-col">
+                
+                <!-- Top Header -->
+                {% include "header.html" %}
+
+                <!-- Page Content -->
+                <main class="flex-1 p-6 lg:p-8 bg-gray-900 text-gray-200">
+                    <!-- This block is where page content will be injected -->
+                    {% block content %}
+                    <h1 class="text-2xl font-bold text-white">Welcome</h1>
+                    <p>This is the base template.</p>
+                    {% endblock content %}
+                </main>
+
+                <!-- Footer -->
+                {% include "footer.html" %}
+
+            </div>
+        </div>
+    </div>
+</body>
+</html>

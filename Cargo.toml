@@ -1,0 +1,28 @@
+[package]
+name = "hirowire"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# The web server
+actix-web = "4"
+
+# The templating engine for our HTML
+tera = "1"
+
+# For handling form data
+serde = { version = "1.0", features = ["derive"] }
+
+# For talking to the OPNsense API
+reqwest = { version = "0.12", features = ["json", "blocking"] } # Using blocking for simplicity here
+
+# For generating WireGuard keys and configs
+wg-config = "0.3"
+
+# For validating IP addresses
+ipnet = "2.9"
+
+# The async runtime
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

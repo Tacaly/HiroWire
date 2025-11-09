@@ -1,0 +1,49 @@
+#
+# --- Stage 1: Build Stage ---
+#
+# Use the official Rust image as a builder
+FROM rust:1-slim as builder
+
+# Set the working directory
+WORKDIR /usr/src/app
+
+# Copy the dependency files
+COPY Cargo.toml Cargo.lock ./
+
+# Create a dummy src/main.rs to cache dependencies
+RUN mkdir src && echo "fn main(){}" > src/main.rs
+
+# Build dependencies. This layer is cached as long as Cargo.toml/Cargo.lock don't change.
+# We use --locked to ensure reproducible builds
+RUN cargo build --release --locked
+
+# Clean up build artifacts from the dummy main.rs
+RUN rm -f target/release/deps/wireguard_tool*
+
+# Copy the actual source code
+COPY . .
+
+# Build the final application
+RUN cargo build --release --locked
+
+#
+# --- Stage 2: Final Stage ---
+#
+# Use a minimal, secure "distroless" image.
+# This one includes common CA certificates, which reqwest (using rustls) needs.
+FROM gcr.io/distroless/cc-static
+
+# Set the working directory
+WORKDIR /usr/local/bin/
+
+# Copy the compiled binary from the builder stage
+COPY --from=builder /usr/src/app/target/release/wireguard-tool .
+
+# Copy the templates directory, which the application needs to run
+COPY templates/ ./templates/
+
+# Expose port 8080 (which we set in src/main.rs)
+EXPOSE 8080
+
+# The command to run the application
+CMD ["./wireguard-tool"]
